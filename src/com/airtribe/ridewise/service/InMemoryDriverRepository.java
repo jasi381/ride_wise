@@ -1,0 +1,15 @@
+package com.airtribe.ridewise.service;
+
+import com.airtribe.ridewise.model.Driver;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+public final class InMemoryDriverRepository implements DriverRepository {
+    private final Map<String, Driver> drivers = new LinkedHashMap<>();
+    @Override public void save(Driver driver) { drivers.put(driver.getId(), driver); }
+    @Override public Optional<Driver> findById(String id) { return Optional.ofNullable(drivers.get(id)); }
+    @Override public List<Driver> findAll() { return new ArrayList<>(drivers.values()); }
+}
