@@ -17,7 +17,7 @@ public final class RideService {
     private final RideRepository rides;
     private final IdGenerator ids;
     private RideMatchingStrategy matchingStrategy;
-    private FareStrategy fareStrategy;
+    private final FareCalculator fareCalculator;
 
     public RideService(RiderService riderService, DriverService driverService, RideRepository rides,
                        RideMatchingStrategy matchingStrategy, FareStrategy fareStrategy, IdGenerator ids) {
@@ -25,7 +25,7 @@ public final class RideService {
         this.driverService = driverService;
         this.rides = rides;
         this.matchingStrategy = matchingStrategy;
-        this.fareStrategy = fareStrategy;
+        this.fareCalculator = new FareCalculator(fareStrategy);
         this.ids = ids;
     }
 
@@ -44,7 +44,7 @@ public final class RideService {
     public FareReceipt completeRide(String rideId) {
         Ride ride = getRideById(rideId);
         if (ride.getStatus() != RideStatus.ASSIGNED) throw new IllegalStateException("Only assigned rides can be completed.");
-        double amount = Math.round(fareStrategy.calculateFare(ride) * 100.0) / 100.0;
+        double amount = fareCalculator.calculateFare(ride);
         FareReceipt receipt = new FareReceipt(ride.getId(), amount);
         ride.complete(receipt);
         ride.getDriver().finishRide();
@@ -66,5 +66,5 @@ public final class RideService {
 
     public List<Ride> listRides() { return rides.findAll(); }
     public void setMatchingStrategy(RideMatchingStrategy strategy) { matchingStrategy = strategy; }
-    public void setFareStrategy(FareStrategy strategy) { fareStrategy = strategy; }
+    public void setFareStrategy(FareStrategy strategy) { fareCalculator.setStrategy(strategy); }
 }

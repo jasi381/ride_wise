@@ -8,9 +8,9 @@ import com.airtribe.ridewise.model.Ride;
 import com.airtribe.ridewise.model.Rider;
 import com.airtribe.ridewise.model.VehicleType;
 import com.airtribe.ridewise.service.DriverService;
-import com.airtribe.ridewise.service.DriverRepository;
-import com.airtribe.ridewise.service.RideRepository;
-import com.airtribe.ridewise.service.RiderRepository;
+import com.airtribe.ridewise.service.InMemoryDriverRepository;
+import com.airtribe.ridewise.service.InMemoryRideRepository;
+import com.airtribe.ridewise.service.InMemoryRiderRepository;
 import com.airtribe.ridewise.service.RideService;
 import com.airtribe.ridewise.service.RiderService;
 import com.airtribe.ridewise.strategy.DefaultFareStrategy;
@@ -28,9 +28,9 @@ public final class Main {
     private final RideService rideService;
 
     private Main() {
-        riderService = new RiderService(new RiderRepository(), new IdGenerator("R"));
-        driverService = new DriverService(new DriverRepository(), new IdGenerator("D"));
-        rideService = new RideService(riderService, driverService, new RideRepository(),
+        riderService = new RiderService(new InMemoryRiderRepository(), new IdGenerator("R"));
+        driverService = new DriverService(new InMemoryDriverRepository(), new IdGenerator("D"));
+        rideService = new RideService(riderService, driverService, new InMemoryRideRepository(),
                 new NearestDriverStrategy(), new DefaultFareStrategy(), new IdGenerator("T"));
     }
 
