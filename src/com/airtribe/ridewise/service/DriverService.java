@@ -4,16 +4,16 @@ import com.airtribe.ridewise.model.Driver;
 import com.airtribe.ridewise.model.Location;
 import com.airtribe.ridewise.model.VehicleType;
 import com.airtribe.ridewise.util.IdGenerator;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public final class DriverService {
     private final DriverRepository drivers;
     private final IdGenerator ids;
 
     public DriverService(DriverRepository drivers, IdGenerator ids) {
-        this.drivers = java.util.Objects.requireNonNull(drivers);
-        this.ids = java.util.Objects.requireNonNull(ids);
+        this.drivers = drivers;
+        this.ids = ids;
     }
 
     public Driver registerDriver(String name, Location location, VehicleType vehicleType) {
@@ -28,10 +28,16 @@ public final class DriverService {
     }
 
     public Driver getDriverById(String id) {
-        return drivers.findById(id).orElseThrow(() -> new IllegalArgumentException("Driver not found: " + id));
+        Driver driver = drivers.findById(id);
+        if (driver == null) throw new IllegalArgumentException("Driver not found: " + id);
+        return driver;
     }
 
     public List<Driver> listAvailableDrivers() {
-        return drivers.findAll().stream().filter(Driver::isAvailable).collect(Collectors.toList());
+        List<Driver> available = new ArrayList<>();
+        for (Driver driver : drivers.findAll()) {
+            if (driver.isAvailable()) available.add(driver);
+        }
+        return available;
     }
 }

@@ -17,25 +17,25 @@ public final class RideService {
     private final RideRepository rides;
     private final IdGenerator ids;
     private RideMatchingStrategy matchingStrategy;
-    private final FareCalculator fareCalculator;
+    private FareStrategy fareStrategy;
 
     public RideService(RiderService riderService, DriverService driverService, RideRepository rides,
                        RideMatchingStrategy matchingStrategy, FareStrategy fareStrategy, IdGenerator ids) {
-        this.riderService = java.util.Objects.requireNonNull(riderService);
-        this.driverService = java.util.Objects.requireNonNull(driverService);
-        this.rides = java.util.Objects.requireNonNull(rides);
-        this.matchingStrategy = java.util.Objects.requireNonNull(matchingStrategy);
-        this.fareCalculator = new FareCalculator(fareStrategy);
-        this.ids = java.util.Objects.requireNonNull(ids);
+        this.riderService = riderService;
+        this.driverService = driverService;
+        this.rides = rides;
+        this.matchingStrategy = matchingStrategy;
+        this.fareStrategy = fareStrategy;
+        this.ids = ids;
     }
 
     public Ride requestRide(String riderId, double distanceKm) {
         Rider rider = riderService.getRiderById(riderId);
-        Ride ride = new Ride(ids.nextId(), rider, distanceKm);
-        rides.save(ride);
         List<Driver> availableDrivers = driverService.listAvailableDrivers();
         Driver driver = matchingStrategy.findDriver(rider, availableDrivers);
         if (driver == null) throw new NoDriverAvailableException("No available driver could be matched.");
+        Ride ride = new Ride(ids.nextId(), rider, distanceKm);
+        rides.save(ride);
         ride.assign(driver);
         driver.startRide();
         return ride;
@@ -44,7 +44,7 @@ public final class RideService {
     public FareReceipt completeRide(String rideId) {
         Ride ride = getRideById(rideId);
         if (ride.getStatus() != RideStatus.ASSIGNED) throw new IllegalStateException("Only assigned rides can be completed.");
-        double amount = fareCalculator.calculateFare(ride);
+        double amount = Math.round(fareStrategy.calculateFare(ride) * 100.0) / 100.0;
         FareReceipt receipt = new FareReceipt(ride.getId(), amount);
         ride.complete(receipt);
         ride.getDriver().finishRide();
@@ -59,10 +59,12 @@ public final class RideService {
     }
 
     public Ride getRideById(String id) {
-        return rides.findById(id).orElseThrow(() -> new IllegalArgumentException("Ride not found: " + id));
+        Ride ride = rides.findById(id);
+        if (ride == null) throw new IllegalArgumentException("Ride not found: " + id);
+        return ride;
     }
 
     public List<Ride> listRides() { return rides.findAll(); }
-    public void setMatchingStrategy(RideMatchingStrategy strategy) { matchingStrategy = java.util.Objects.requireNonNull(strategy); }
-    public void setFareStrategy(FareStrategy strategy) { fareCalculator.setStrategy(strategy); }
+    public void setMatchingStrategy(RideMatchingStrategy strategy) { matchingStrategy = strategy; }
+    public void setFareStrategy(FareStrategy strategy) { fareStrategy = strategy; }
 }

@@ -12,7 +12,7 @@ public final class PeakHourFareStrategy implements FareStrategy {
         if (!Double.isFinite(multiplier) || multiplier < 1) {
             throw new IllegalArgumentException("Peak multiplier must be at least 1.");
         }
-        this.baseStrategy = java.util.Objects.requireNonNull(baseStrategy);
+        this.baseStrategy = baseStrategy;
         this.multiplier = multiplier;
     }
 
