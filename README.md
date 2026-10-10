@@ -54,7 +54,8 @@ Locations are latitude/longitude pairs.
 src/com/airtribe/ridewise/
   Main.java        menu and input handling
   model/           Rider, Driver, Ride, FareReceipt, Location, enums
-  service/         RiderService, DriverService, RideService + simple repositories
+  service/         RiderService, DriverService, RideService, FareCalculator,
+                   repository interfaces + in-memory versions
   strategy/        matching and fare strategies
   exception/       NoDriverAvailableException
   util/            IdGenerator
