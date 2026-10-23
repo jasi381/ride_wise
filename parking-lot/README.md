@@ -28,22 +28,6 @@ Everything `ParkingService` uses is an interface (`SpotAllocationStrategy`, `Fee
 
 Failure handling: a ticket is stored only after a spot is secured, and the spot is returned if storing fails, so a failed check-in leaves neither a stranded ticket nor a leaked spot.
 
-## What changed after v1 feedback
-
-| v1 feedback | v2 |
-|---|---|
-| No automated tests | JUnit 5 suite: fee rules, allocation, service flows, and multi-threaded races |
-| `VehicleType` unused | Drives both spot compatibility and the hourly rate |
-| `updateAvailability` never called | No such method; availability is owned by the allocator and only changes through `allocate`/`release` |
-| Peak strategy always applied | Multiplier applies per hour, based on wall-clock time, with tests for in/out/overnight windows |
-| Service creates its own calculator, depends on concrete classes | All dependencies injected as interfaces; no separate calculator wrapper |
-| Repeated filter/tie-break logic, copy-paste repositories | One ordering (`ParkingSpot.compareTo`) used by the sorted sets; a single repository |
-| Public `setAvailable` | `ParkingSpot`, `Vehicle` and `ParkingTransaction` are immutable records |
-| `Main` switch with `new` per strategy | Strategy map; `Main` only wires |
-| Law-of-Demeter chains | `Receipt.from(...)` and service methods return what callers need |
-| Menu numbering | Sequential 1-5, Exit is 0 |
-| Entity saved before assignment could fail | Spot is secured first, ticket stored last |
-
 ## Layout
 
 ```
