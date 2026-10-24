@@ -1,64 +1,52 @@
-# RideWise
+# Smart Parking Lot (v2)
 
-Small console app for booking rides, written in plain Java. No libraries, no build tool. Everything lives in memory, so data is gone when you quit.
+Backend for a multi-floor parking lot: spot allocation, check-in/check-out, fee calculation and live availability. Spring Boot 3 (Java 17). Tickets are stored in SQL (embedded H2 file `./data/parking`, schema in `src/main/resources/schema.sql`), so they survive restarts. Spot occupancy is rebuilt from active tickets at startup.
+
+## API
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/tickets` | Check in. Body `{"plate":"KA01AB1234","type":"CAR"}` (`MOTORCYCLE`, `CAR`, `BUS`). 201, or 409 if full or plate already parked. |
+| POST | `/api/tickets/{id}/checkout` | Check out, returns the receipt. 404 unknown ticket, 409 already closed. |
+| GET | `/api/availability` | Free spots per size. |
+| GET | `/api/tickets` | Active tickets. |
+| GET | `/api/tickets/history` | All tickets. |
 
 ## Run
 
 ```sh
-mkdir -p out
-javac -d out $(find src -name '*.java')
-java -cp out com.airtribe.ridewise.Main
+./gradlew test                                          # 35 tests, including concurrency
+./gradlew bootRun                                       # http://localhost:8080, hourly fees
+./gradlew bootRun --args='--parking.fee-strategy=peak'  # peak-hour surcharge
 ```
 
-Needs Java 11 or newer.
+Menu: 1 Check in, 2 Check out, 3 Availability, 4 Parked vehicles, 5 History, 0 Exit. Check-in prints a ticket id (`T1`); check-out takes it and prints a receipt.
 
-## How it works
+## Design
 
-You get a numbered menu:
+| Concern | Where | How |
+|---|---|---|
+| Spot allocation | `BestFitSpotAllocation` | Free spots live in one sorted set per size. The smallest size that fits is tried first, lowest floor and number first. Taking a spot is an atomic `pollFirst()`, O(log n). |
+| Vehicle to spot | `VehicleType` | Motorcycle needs SMALL or bigger, car MEDIUM or bigger, bus LARGE only. |
+| Fees | `HourlyFeeStrategy`, `PeakHourFeeStrategy` | Rate comes from `RateCard` per vehicle type. 15 minute grace, then every started hour is billed. Peak adds x1.5 only to hours that start inside the peak window. |
+| Concurrency | `ParkingService` + collaborators | No global lock. Spot: atomic poll. Plate: conditional insert (one active ticket per plate). Check-out: conditional close, so only one caller frees the spot and charges the fee. |
+| Availability | `ParkingService.availability()` | Counted from the allocator's free sets, so it is never out of step with allocation. |
+| Time | `java.time.Clock` | Injected, so tests move time by hand. |
 
-1. Add rider
-2. Add driver
-3. List available drivers
-4. Request ride
-5. Complete ride
-6. List rides
-7. Cancel ride
-8. Pick matching strategy
-9. Pick fare strategy
+Everything `ParkingService` uses is an interface (`SpotAllocationStrategy`, `FeeStrategy`, `TransactionRepository`, `Clock`, id `Supplier`), injected through the constructor. Adding a fee strategy is a new class plus one case in `ParkingConfig.feeStrategy`.
 
-IDs are handed out as `R1` for riders, `D1` for drivers and `T1` for rides. To request a ride you give a rider ID and the trip distance in km. If no driver is free, the request fails and no ride is created.
+Failure handling: a ticket is stored only after a spot is secured, and the spot is returned if storing fails, so a failed check-in leaves neither a stranded ticket nor a leaked spot.
 
-A ride goes `REQUESTED` -> `ASSIGNED` -> `COMPLETED`, or `CANCELLED`. A driver is busy while holding an assigned ride and free again once it is completed or cancelled.
-
-## Matching and fares
-
-Both are swappable at runtime from the menu.
-
-| Matching | Picks |
-|---|---|
-| Nearest | closest free driver to the rider |
-| Least active | free driver with the fewest rides so far |
-
-Ties go to the lower driver ID.
-
-| Fare | Price |
-|---|---|
-| Default | 40 + 12 per km |
-| Peak hour | default fare x 1.5 |
-
-Locations are latitude/longitude pairs.
-
-## Code layout
+## Layout
 
 ```
-src/com/airtribe/ridewise/
-  Main.java        menu and input handling
-  model/           Rider, Driver, Ride, FareReceipt, Location, enums
-  service/         RiderService, DriverService, RideService, FareCalculator,
-                   repository interfaces + in-memory versions
-  strategy/        matching and fare strategies
-  exception/       NoDriverAvailableException
-  util/            IdGenerator
+src/main/java/com/airtribe/parkinglot/
+  ParkingLotApplication.java
+  api/                 ParkingController, ApiExceptionHandler, ParkingConfig
+  model/        VehicleType, SpotSize, ParkingSpot, Vehicle, ParkingTransaction, Receipt
+  strategy/     SpotAllocationStrategy, BestFitSpotAllocation, FeeStrategy, RateCard, Hourly/PeakHour strategies
+  service/      ParkingService, ParkingLotLayout
+  repository/   TransactionRepository, JdbcTransactionRepository, InMemoryTransactionRepository (test double)
+  exception/    ParkingException and its subclasses
+src/test/java/  unit and concurrency tests
 ```
-
-To add a new matching or fare rule, implement `RideMatchingStrategy` or `FareStrategy` and add a line to the menu in `Main`.
